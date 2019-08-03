@@ -1,0 +1,70 @@
+---
+title: "ExecutionSession2"
+author: "Deepti Gupta"
+date: "August 3, 2019"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## INTRODUCTION
+
+
+Analyse if there exists a gender gap between male and female incomes between different categories of industry from the labour statistics data from the Bureau of Labor Statistics
+
+
+## DATA ANALYSIS
+
+```{r echo = FALSE }
+
+x = 5
+
+```
+The x value is equal `r x`.
+
+
+
+```{r}
+
+library(readr)
+income <- read_csv("C:/Study/695-ResearchMethodologyAndWriting/Week13/income.csv")
+View(income)
+
+income1 <- income[complete.cases(income),]
+head(income1)
+
+incomeMale <- income1[,c(2,6)]
+incomeMale$Gender <- "Male"
+colnames(incomeMale) <- c("Industry", "Income", "Gender")
+head(incomeMale)
+
+incomeFemale <- income1[,c(2,7)]
+incomeFemale$Gender <- "Female"
+colnames(incomeFemale) <- c("Industry", "Income", "Gender")
+head(incomeFemale)
+
+incomeAll <- rbind(incomeMale, incomeFemale)
+head(incomeAll)
+
+incomeAll$Industry <- as.factor(incomeAll$Industry)
+
+
+library(ggplot2)
+library(ggpubr)
+
+
+ggplot(data=incomeAll, aes(y=as.numeric(Income), x=Industry, Fill = as.factor(Gender))) + geom_bar(stat="identity", position=position_dodge(), aes(fill = Gender))  + ggpubr::rotate_x_text()
+
+```
+
+## REGRESSION ANALYSIS
+```{r}
+lmIncome <- lm(Income ~ ., data = incomeAll)
+summary(lmIncome)
+
+
+```
