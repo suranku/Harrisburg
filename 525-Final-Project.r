@@ -1,0 +1,201 @@
+---
+title: "525 Final Project"
+author: "Pallava Arasu Pari"
+date: "4/12/2020"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Set Path and Load libraries
+```{r}
+setwd("~/Harrisburg/525")
+library(Quandl)
+library(readxl)
+library(FRAPO)
+library(timeSeries)
+library(QRM)
+library(fGarch)
+library(readr)
+library(zoo)
+library(fBasics)
+#library(fitdistrplus)
+library(forecast)
+
+
+```
+
+# Load Data
+```{r}
+library(Quandl)
+```
+
+```{r}
+#data from bombday exchange market
+
+#Indian Oil Corporation
+IOC<-Quandl("BSE/BOM530965", start_date="2015-01-01")
+
+#Tata Steel
+tata_Stell<-Quandl("BSE/BOM500470", start_date="2015-01-01")
+
+#Infosys is a leading Information Technolgy firm
+infosys<-Quandl("BSE/BOM500209", start_date="2015-01-01")
+```
+
+
+# Data Exploration
+```{r}
+date<-IOC$Date
+
+IOCClose<-IOC$`Close`
+TataSteelClose<-tata_Stell$`Close`
+InfosysClose<-infosys$`Close`
+
+attr(IOCClose, 'time')<-date
+attr(TataSteelClose, 'time')<-date
+attr(InfosysClose, 'time')<-date
+
+datechar<-as.character(IOC$Date)
+```
+
+Trasnformations
+```{r}
+library(timeSeries)
+#combining data
+assets<-cbind(IOCClose,TataSteelClose,InfosysClose)
+#timeseries
+asseststs<-timeSeries(assets,charvec = datechar)
+plot(asseststs)
+```
+
+Calculating Loss
+```{r}
+assestsLoss<-as.data.frame(na.omit(-1.0*diff(log(asseststs))*100.0))
+assestsLossts<-timeSeries(assestsLoss)
+plot(assestsLossts)
+head(assestsLoss)
+IOCCloseLossMean=mean(assestsLossts$IOCClose)
+TataSteelCloseLossMean=mean(assestsLossts$TataSteelClose)
+InfosysCloseLossMean=mean(assestsLossts$InfosysClose)
+IOCCloseLossMean
+TataSteelCloseLossMean
+InfosysCloseLossMean
+```
+
+
+Calculating returns
+```{r}
+assetsReturns<-na.omit(returnseries(asseststs, method = "discrete",trim = FALSE))
+plot(assetsReturns)
+IOCReturnsMean=mean(assetsReturns$IOCClose)  
+IOCReturnsMean  #0.1775025
+TataSteelReturnsMean=mean(assetsReturns$TataSteelClose)  
+TataSteelReturnsMean   #0.05557905
+InfosysReturnsMean=mean(assetsReturns$InfosysClose) 
+InfosysReturnsMean #0.1465191
+
+```
+
+`r max(IOCReturnsMean,TataSteelReturnsMean,InfosysReturnsMean)` offers the highest expected return
+
+
+acf and pacf 
+```{r}
+par(mfrow=c(3,2), mar = c(4,4,4,4) ) 
+
+IOC
+acf(assestsLossts$IOCClose, main="ACF of IOC Losses" , lag.max=20, ylab="", xlab= "", col="blue", ci.col="red") 
+pacf(assestsLossts$IOCClose, main="PACF of IOC Losses" , lag.max=20, ylab="", xlab= "", col="blue", ci.col="red") 
+
+##Tata Steel
+acf(assestsLossts$TataSteelClose, main="ACF of Tata Steel Losses" , lag.max=20, ylab="", xlab= "", col="blue", ci.col="red") 
+pacf(assestsLossts$TataSteelClose, main="ACF of Tata Steel Losses" , lag.max=20, ylab="", xlab= "", col="blue", ci.col="red") 
+
+##Infosys
+acf(assestsLossts$InfosysClose, main="ACF of Infosys Losses" , lag.max=20, ylab="", xlab= "", col="blue", ci.col="red") 
+pacf(assestsLossts$InfosysClose, main="ACF of Infosys Losses" , lag.max=20, ylab="", xlab= "", col="blue", ci.col="red") 
+```
+
+#Arima
+
+Find Order of Arima
+```{r}
+#Rank of IOC arima model:
+arimaIOC=auto.arima(assestsLossts$IOCClose)#000
+arimaIOC
+
+#Rank of Tata Steel arima model:
+arimaTataSteel=auto.arima(assestsLossts$TataSteelClose)#203
+arimaTataSteel
+
+#Rank of Infoys arima model:
+arimaInfosys=auto.arima(assestsLossts$InfosysClose)#302
+arimaInfosys
+
+```
+
+Function for Expected Shortfall measure of risk with 95 %
+```{r}
+ESgarch <- function(y,asset=1, p = 0.95){
+  gfitIOC =garchFit(formula = ~arma(0,0,0)+garch(1, 1), data = y,
+                   cond.dist = "std", trace = FALSE)
+  gfitTataSteel =garchFit(formula = ~arma(2,0,3)+garch(1, 1), data = y,
+                   cond.dist = "std", trace = FALSE)
+  gfitInfosys=garchFit(formula = ~arma(3,0,2)+garch(1, 1), data = y,
+                   cond.dist = "std", trace = FALSE)
+  gfit<-switch (asset,gfitIOC,gfitTataSteel,gfitInfosys)
+
+  sigma <-  as.numeric(predict(gfit, n.ahead = 1)[3])
+  df <- as.numeric(coef(gfit)["shape"])
+  ES <- sigma * (dt(qt(p, df), df)/(1 - p)) *
+    ((df + (qt(p, df))^2)/(df - 1))
+  return(ES)
+}
+
+```
+#Garch
+ES for the individual assests
+```{r}
+#ES of IOC
+ESGarchIOC=ESgarch(assestsLossts$IOCClose,asset=1)
+ESGarchIOC
+
+#ES of Tata Steel
+ESGarchTataSteel=ESgarch(assestsLossts$TataSteelClose,asset=2)
+ESGarchTataSteel
+
+#ES of Infosys
+ESGarchInfosys=ESgarch(assestsLossts$InfosysClose,asset=3)
+ESGarchInfosys
+
+```
+Estimated Shorfall measure of Risk with 95% CI for IOC is `r ESGarchIOC`, Tata Steel is `r ESGarchTataSteel` and Infosys is `r ESGarchInfosys`
+
+`r c('IOC','Tata Steel','Infosys')[which.max(c(ESGarchIOC,ESGarchTataSteel,ESGarchInfosys))]` has the highest overall risk with 95% confidance.
+
+
+
+Covariance Martrix on Returns
+```{r}
+assetscov <-cov(assetsReturns, use="pairwise.complete.obs")
+assetscov
+```
+
+We worry more about the risk than the profit. So lets check out the Global Minimum Variance Portfolio
+```{r}
+GMVP<-PGMV(assetscov,percentage = FALSE)
+w<-Weights(GMVP)
+GMVPwIOC<-as.numeric(w[1])
+GMVPwIOC   # 0.1540196
+GMVPwTataSteel<-as.numeric(w[2])
+GMVPwTataSteel   # 0.6474288
+GMVPwInfosys<-as.numeric(w[3])
+GMVPwInfosys # 0.1985516
+
+```
