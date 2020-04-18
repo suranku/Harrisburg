@@ -26,15 +26,10 @@ library(zoo)
 library(fBasics)
 #library(fitdistrplus)
 library(forecast)
-
-
 ```
 
-# Load Data
-```{r}
-library(Quandl)
-```
 
+#Load Data
 ```{r}
 #data from bombday exchange market
 
@@ -189,13 +184,17 @@ assetscov
 
 We worry more about the risk than the profit. So lets check out the Global Minimum Variance Portfolio
 ```{r}
-GMVP<-PGMV(assetscov,percentage = FALSE)
+GMVP<-PGMV(assetscov,percentage = TRUE)
 w<-Weights(GMVP)
 GMVPwIOC<-as.numeric(w[1])
-GMVPwIOC   # 0.1540196
+GMVPwIOC   # 15.40196
 GMVPwTataSteel<-as.numeric(w[2])
-GMVPwTataSteel   # 0.6474288
+GMVPwTataSteel   # 64.74288
 GMVPwInfosys<-as.numeric(w[3])
-GMVPwInfosys # 0.1985516
+GMVPwInfosys # 19.85516
+
+```
+```{r}
+Weights(GMVP)
 
 ```
